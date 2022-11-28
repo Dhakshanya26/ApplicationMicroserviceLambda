@@ -25,6 +25,9 @@ Resources:
           Properties:
             Path: /loanapplication
             Method: post
+      Policies:
+      # Give the Lambda service access to poll your DynamoDB Stream
+        - AmazonDynamoDBFullAccess
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function

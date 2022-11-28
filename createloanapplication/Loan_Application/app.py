@@ -5,18 +5,19 @@ import boto3
 
 client = boto3.client('dynamodb')
 def lambda_handler(event, context):
-
+    print(event)
+    input = json.loads(event['body'])
     data = client.put_item(
         TableName = 'applications',
         Item = {
             'id': {
-                'S':  uuid.uuid1()
+                'S':  str(uuid.uuid1())
             },
             'firstname': {
-                'S': event['firstname']
+                'S': input['firstname']
             },
             'lastname': {
-                'S': event['lastname']
+                'S': input['lastname']
             }
         }
     )
