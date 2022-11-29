@@ -61,7 +61,7 @@ Resources:
       # Give the Lambda service access to poll your DynamoDB Stream
         - AmazonDynamoDBFullAccess
 
-  GetApplicationStatusFunction:
+  GetAppStatusFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
       CodeUri: ApplicationStatus/
@@ -70,14 +70,15 @@ Resources:
       Architectures:
         - x86_64
       Events:
-        LoanApplication:
+        AppStatus:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
             Path: /applicationstatus
-            Method: post
+            Method: get
       Policies:
       # Give the Lambda service access to poll your DynamoDB Stream
         - AmazonDynamoDBFullAccess
+        - AmazonEventBridgeFullAccess
 
   # CloudWatch Log Group
   LoanApplicationEventBus:
@@ -238,6 +239,10 @@ Outputs:
   LoanApplicationApi:
     Description: "API Gateway endpoint URL for Prod stage for Hello World function"
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/loanapplication/"
+
+  AppStatusApi:
+    Description: "API Gateway endpoint URL for Get stage for Application status"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/applicationstatus/"
   LoanApplicationFunction:
     Description: "LoanApplication Lambda Function ARN"
     Value: !GetAtt LoanApplicationFunction.Arn

@@ -37,4 +37,13 @@ manifest_hash = ""
 packagetype = "Zip"
 functions = ["CalculateTotalScoreFunction"]
 
+[function_build_definitions.b04c4b71-05ec-4ed5-a2a5-c9f54da9437c]
+codeuri = "/Users/arumsudu/Desktop/SaLaunchProject/ApplicationserviceLambda/ApplicationMicroserviceLambda/createloanapplication/ApplicationStatus"
+runtime = "python3.9"
+architecture = "x86_64"
+handler = "app.lambda_handler"
+manifest_hash = ""
+packagetype = "Zip"
+functions = ["GetAppStatusFunction"]
+
 [layer_build_definitions]
