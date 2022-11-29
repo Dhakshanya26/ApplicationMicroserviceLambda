@@ -4,11 +4,12 @@
   "States": {
     "Pass input": {
       "Type": "Pass",
-      "Next": "Parallel"
+      "Next": "Parallel",
+      "OutputPath": "$.detail"
     },
     "Parallel": {
       "Type": "Parallel",
-      "Next": "Save Credit and Fraud score",
+      "Next": "Get Application details",
       "Branches": [
         {
           "StartAt": "Get Credit Data",
@@ -18,7 +19,7 @@
               "Resource": "arn:aws:states:::lambda:invoke",
               "Parameters": {
                 "Payload.$": "$",
-                "FunctionName": "arn:aws:lambda:eu-west-2:617724809275:function:y-GetCustomerCreditDataFunction-Z3a0hllzhikk:$LATEST"
+                "FunctionName": "${GetCustomerCreditDataFunction}"
               },
               "Retry": [
                 {
@@ -49,7 +50,7 @@
               "Resource": "arn:aws:states:::lambda:invoke",
               "Parameters": {
                 "Payload.$": "$",
-                "FunctionName": "arn:aws:lambda:eu-west-2:617724809275:function:y-GetCustomerFraudDataFunction-5K50oYI2ffza:$LATEST"
+                "FunctionName": "${GetCustomerFraudDataFunction}"
               },
               "Retry": [
                 {
@@ -79,6 +80,20 @@
         "FraudScore.$": "$[1].FraudScore.Score.fraudscore"
       }
     },
+    "Get Application details": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:getItem",
+      "Parameters": {
+        "TableName": "applications",
+        "Key": {
+          "Id": {
+            "S.$": "$.Id"
+          }
+        }
+      },
+      "Next": "Save Credit and Fraud score",
+      "ResultPath": "$.ApplicationDetail"
+    },
     "Save Credit and Fraud score": {
       "Type": "Task",
       "Resource": "arn:aws:states:::dynamodb:putItem",
@@ -89,7 +104,7 @@
             "S.$": "$.Id"
           },
           "ApplicationId": {
-            "S.$": "$.ApplicationId"
+            "S.$": "$.Id"
           },
           "ApplicationStatus": {
             "S": "Pending"
@@ -111,7 +126,7 @@
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
         "Payload.$": "$",
-        "FunctionName": "arn:aws:lambda:eu-west-2:617724809275:function:y-CalculateTotalScoreFunction-sAfSmAblSMtT:$LATEST"
+        "FunctionName": "${CalculateTotalScoreFunction}"
       },
       "Retry": [
         {
@@ -144,7 +159,7 @@
                   "NumericGreaterThan": 1
                 },
                 {
-                  "Variable": "$.Amount",
+                  "Variable": "$.ApplicationDetail.Item.loanAmount",
                   "NumericLessThan": 100
                 }
               ]

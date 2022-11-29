@@ -13,7 +13,7 @@ Globals:
 Parameters:
   ParameterInstancePrefix:
     Type: String
-    Default: "kyc"
+    Default: "loan"
     Description: "Prefix to be used in names of the things created by this stack."
 
 Resources:
@@ -46,8 +46,8 @@ Resources:
   LoanApplicationFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
-      CodeUri: Loan_Application/
-      Handler: app.lambda_handler
+      CodeUri: CreateLoanApplication/
+      Handler: createloanapp.lambda_handler
       Runtime: python3.9
       Architectures:
         - x86_64
@@ -60,6 +60,7 @@ Resources:
       Policies:
       # Give the Lambda service access to poll your DynamoDB Stream
         - AmazonDynamoDBFullAccess
+        - AmazonEventBridgeFullAccess
 
   GetAppStatusFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
@@ -81,10 +82,10 @@ Resources:
         - AmazonEventBridgeFullAccess
 
   # CloudWatch Log Group
-  LoanApplicationEventBus:
+  LoanAppEventBus:
     Type: AWS::Events::EventBus
     Properties:
-      Name: LoanApplicationEventBus
+      Name: LoanAppEventBus
   AccountsLogGroup: 
     Type: AWS::Logs::LogGroup
     Properties: 
@@ -104,30 +105,21 @@ Resources:
 
 
   # Step Function
-  LoanApplicationStateMachine:
+  AppStateMachine:
     Type: AWS::Serverless::StateMachine
     Properties:
       DefinitionUri: statemachine/application.asl.json
       DefinitionSubstitutions:
-        CentralEventBusName: !Ref LoanApplicationEventBus
+        CentralEventBusName: !Ref LoanAppEventBus
+        GetCustomerCreditDataFunction: !GetAtt  GetCustomerCreditDataFunction.Arn
+        GetCustomerFraudDataFunction: !GetAtt  GetCustomerFraudDataFunction.Arn
+        CalculateTotalScoreFunction: !GetAtt  CalculateTotalScoreFunction.Arn 
       Policies:
         - AWSXRayDaemonWriteAccess
-        - EventBridgePutEventsPolicy:
-            EventBusName: !Ref LoanApplicationEventBus
-        - Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Action:
-                - 'logs:CreateLogDelivery'
-                - 'logs:GetLogDelivery'
-                - 'logs:UpdateLogDelivery'
-                - 'logs:DeleteLogDelivery'
-                - 'logs:ListLogDeliveries'
-                - 'logs:PutResourcePolicy'
-                - 'logs:DescribeResourcePolicies'
-                - 'logs:DescribeLogGroups'
-                - 'cloudwatch:PutMetricData'
-              Resource: '*'
+        - AWSLambda_FullAccess
+        - AmazonDynamoDBFullAccess
+        - CloudWatchFullAccess
+        - AmazonEventBridgeFullAccess 
       Logging:
         Destinations:
           - CloudWatchLogsLogGroup:
@@ -140,7 +132,7 @@ Resources:
         SubmittedRule:
           Type: EventBridgeRule
           Properties:
-            EventBusName: !Ref LoanApplicationEventBus
+            EventBusName: !Ref LoanAppEventBus
             InputPath: $.detail
             Pattern:
               source:
@@ -149,14 +141,58 @@ Resources:
                   - Loan Application Submitted
               account:
                   - !Ref AWS::AccountId
-    
+
+  LoanAppSubmittedRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: LoanAppSubmittedRule
+      EventBusName: !GetAtt LoanAppEventBus.Arn
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt AppStateMachine.Arn
+          Id: "AppStateMachine"
+          RoleArn: !GetAtt 
+            - EventBridgeIAMrole
+            - Arn
+      EventPattern:
+        source:
+          - com.aws.submitloanapp
+ 
+  EventBridgeIAMrole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: !Sub events.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: / 
+      Policies:
+        - PolicyName: AccessStepFunction
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "cloudwatch:*"
+                  - "logs:*"
+                  - "lambda:InvokeFunction"
+                  - "events:PutEvents"
+                  - "events:*"
+                  - "schemas:*"
+                  - "scheduler:*"
+                Resource: 
+                  - "*"
+
     # Rule process events published by the state machine
   AccountKycResponseRule:
     Type: AWS::Events::Rule
     Properties:
       Name: acc_kyc_response_rule
       Description: Rule to process results of KYC.
-      EventBusName: !Ref LoanApplicationEventBus
+      EventBusName: !Ref LoanAppEventBus
       EventPattern:
         source:
           - com.aws.kyc
@@ -174,7 +210,7 @@ Resources:
     Properties:
       Name: acc_kyc_id_check_rule
       Description: Rule to process KYC response.
-      EventBusName: !Ref LoanApplicationEventBus
+      EventBusName: !Ref LoanAppEventBus
       EventPattern:
         source:
           - com.aws.kyc
@@ -192,7 +228,7 @@ Resources:
     Properties:
       Name: cs_kyc_approved_rule
       Description: Rule to process KYC response.
-      EventBusName: !Ref LoanApplicationEventBus
+      EventBusName: !Ref LoanAppEventBus
       EventPattern:
         source:
           - com.aws.kyc

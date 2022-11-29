@@ -33,15 +33,15 @@ def lambda_handler(event, context):
     )
 
     eventClient = boto3.client('events')
-    detailJsonString = '{"Id":"applicationId"}'
+    detailJsonString = {"Id":applicationId}
 
     publishedEventResponse = eventClient.put_events(
         Entries=[
             {
-                'Source':'user-event',
-                'DetailType':'user-preferences',
-                'Detail':detailJsonString,
-                'EventBusName':'LoanApplicationEventBus' 
+                'Source':'com.aws.submitloanapp',
+                'DetailType':'Order Notification',
+                'Detail':json.dumps(detailJsonString),
+                'EventBusName':'LoanAppEventBus' 
             }
         ]
     )
