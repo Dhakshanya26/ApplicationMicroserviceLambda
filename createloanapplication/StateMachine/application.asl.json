@@ -1,0 +1,197 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "Pass input",
+  "States": {
+    "Pass input": {
+      "Type": "Pass",
+      "Next": "Parallel"
+    },
+    "Parallel": {
+      "Type": "Parallel",
+      "Next": "Save Credit and Fraud score",
+      "Branches": [
+        {
+          "StartAt": "Get Credit Data",
+          "States": {
+            "Get Credit Data": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "Payload.$": "$",
+                "FunctionName": "arn:aws:lambda:eu-west-2:617724809275:function:y-GetCustomerCreditDataFunction-Z3a0hllzhikk:$LATEST"
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException",
+                    "Lambda.TooManyRequestsException"
+                  ],
+                  "IntervalSeconds": 2,
+                  "MaxAttempts": 6,
+                  "BackoffRate": 2
+                }
+              ],
+              "ResultPath": "$.CreditScore",
+              "ResultSelector": {
+                "Score.$": "States.StringToJson($.Payload.body)"
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "GetFraudData",
+          "States": {
+            "GetFraudData": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "Payload.$": "$",
+                "FunctionName": "arn:aws:lambda:eu-west-2:617724809275:function:y-GetCustomerFraudDataFunction-5K50oYI2ffza:$LATEST"
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException",
+                    "Lambda.TooManyRequestsException"
+                  ],
+                  "IntervalSeconds": 2,
+                  "MaxAttempts": 6,
+                  "BackoffRate": 2
+                }
+              ],
+              "ResultSelector": {
+                "Score.$": "States.StringToJson($.Payload.body)"
+              },
+              "ResultPath": "$.FraudScore",
+              "End": true
+            }
+          }
+        }
+      ],
+      "ResultPath": "$.CalculatedScore",
+      "ResultSelector": {
+        "CreditScore.$": "$[0].CreditScore.Score.creditscore",
+        "FraudScore.$": "$[1].FraudScore.Score.fraudscore"
+      }
+    },
+    "Save Credit and Fraud score": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:putItem",
+      "Parameters": {
+        "TableName": "applicationstatus",
+        "Item": {
+          "Id": {
+            "S.$": "$.Id"
+          },
+          "ApplicationId": {
+            "S.$": "$.ApplicationId"
+          },
+          "ApplicationStatus": {
+            "S": "Pending"
+          },
+          "CreditScore": {
+            "S.$": "States.Format('{}',$.CalculatedScore.CreditScore)"
+          },
+          "FraudScore": {
+            "S.$": "States.Format('{}',$.CalculatedScore.FraudScore)"
+          }
+        }
+      },
+      "Next": "Calculate total score",
+      "ResultPath": "$.AfterScore",
+      "ResultSelector": {}
+    },
+    "Calculate total score": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "Payload.$": "$",
+        "FunctionName": "arn:aws:lambda:eu-west-2:617724809275:function:y-CalculateTotalScoreFunction-sAfSmAblSMtT:$LATEST"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "Is Approved?",
+      "ResultSelector": {
+        "TotalScore.$": "States.StringToJson($.Payload.body)"
+      },
+      "ResultPath": "$.CalculatedScore"
+    },
+    "Is Approved?": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "And": [
+            {
+              "And": [
+                {
+                  "Variable": "$.CalculatedScore.TotalScore.totalscore",
+                  "NumericGreaterThan": 1
+                },
+                {
+                  "Variable": "$.Amount",
+                  "NumericLessThan": 100
+                }
+              ]
+            }
+          ],
+          "Next": "Save Approved status"
+        }
+      ],
+      "Default": "Save Decline status"
+    },
+    "Save Approved status": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:updateItem",
+      "Parameters": {
+        "TableName": "applicationstatus",
+        "Key": {
+          "Id": {
+            "S.$": "$.Id"
+          }
+        },
+        "UpdateExpression": "SET ApplicationStatus = :status",
+        "ExpressionAttributeValues": {
+          ":status": {
+            "S": "Approved"
+          }
+        }
+      },
+      "End": true
+    },
+    "Save Decline status": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:updateItem",
+      "Parameters": {
+        "TableName": "applicationstatus",
+        "Key": {
+          "Id": {
+            "S.$": "$.Id"
+          }
+        },
+        "UpdateExpression": "SET ApplicationStatus = :status",
+        "ExpressionAttributeValues": {
+          ":status": {
+            "S": "declined"
+          }
+        }
+      },
+      "End": true
+    }
+  }
+}

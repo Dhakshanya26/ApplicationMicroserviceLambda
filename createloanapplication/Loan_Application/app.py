@@ -4,8 +4,7 @@ import uuid
 import boto3
 
 client = boto3.client('dynamodb')
-def lambda_handler(event, context):
-    print(event)
+def lambda_handler(event, context): 
     input = json.loads(event['body'])
     data = client.put_item(
         TableName = 'applications',

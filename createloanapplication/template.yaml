@@ -10,7 +10,39 @@ Globals:
   Function:
     Timeout: 3
 
+Parameters:
+  ParameterInstancePrefix:
+    Type: String
+    Default: "kyc"
+    Description: "Prefix to be used in names of the things created by this stack."
+
 Resources:
+  GetCustomerCreditDataFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: CustomerCreditData/
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+  GetCustomerFraudDataFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: CustomerFraudData/
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+
+  CalculateTotalScoreFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: CalculateTotalScore/
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64          
+
   LoanApplicationFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
@@ -29,6 +61,176 @@ Resources:
       # Give the Lambda service access to poll your DynamoDB Stream
         - AmazonDynamoDBFullAccess
 
+  GetApplicationStatusFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: ApplicationStatus/
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+      Events:
+        LoanApplication:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /applicationstatus
+            Method: post
+      Policies:
+      # Give the Lambda service access to poll your DynamoDB Stream
+        - AmazonDynamoDBFullAccess
+
+  # CloudWatch Log Group
+  LoanApplicationEventBus:
+    Type: AWS::Events::EventBus
+    Properties:
+      Name: LoanApplicationEventBus
+  AccountsLogGroup: 
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      RetentionInDays: 3
+      LogGroupName: !Join [ "", ["/aws/events/", !Ref ParameterInstancePrefix,"-","accounts-logs"]]
+  CustomerServiceLogGroup: 
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      RetentionInDays: 3
+      LogGroupName: !Join [ "", ["/aws/events/", !Ref ParameterInstancePrefix,"-","customer-service-logs"]]   
+
+  StateMachinesLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 3
+      LogGroupName: !Join [ "", ["/aws/states/", !Ref ParameterInstancePrefix,"-", "statemachine-logs"]]
+
+
+  # Step Function
+  LoanApplicationStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: statemachine/application.asl.json
+      DefinitionSubstitutions:
+        CentralEventBusName: !Ref LoanApplicationEventBus
+      Policies:
+        - AWSXRayDaemonWriteAccess
+        - EventBridgePutEventsPolicy:
+            EventBusName: !Ref LoanApplicationEventBus
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - 'logs:CreateLogDelivery'
+                - 'logs:GetLogDelivery'
+                - 'logs:UpdateLogDelivery'
+                - 'logs:DeleteLogDelivery'
+                - 'logs:ListLogDeliveries'
+                - 'logs:PutResourcePolicy'
+                - 'logs:DescribeResourcePolicies'
+                - 'logs:DescribeLogGroups'
+                - 'cloudwatch:PutMetricData'
+              Resource: '*'
+      Logging:
+        Destinations:
+          - CloudWatchLogsLogGroup:
+              LogGroupArn: !GetAtt  StateMachinesLogGroup.Arn
+        Level: ALL
+        IncludeExecutionData: True
+      Tracing:
+        Enabled: True
+      Events:
+        SubmittedRule:
+          Type: EventBridgeRule
+          Properties:
+            EventBusName: !Ref LoanApplicationEventBus
+            InputPath: $.detail
+            Pattern:
+              source:
+                  - com.aws.accounts
+              detail-type:
+                  - Loan Application Submitted
+              account:
+                  - !Ref AWS::AccountId
+    
+    # Rule process events published by the state machine
+  AccountKycResponseRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: acc_kyc_response_rule
+      Description: Rule to process results of KYC.
+      EventBusName: !Ref LoanApplicationEventBus
+      EventPattern:
+        source:
+          - com.aws.kyc
+        detail-type:
+          - New account approved
+          - New account declined
+      State: ENABLED
+      RoleArn: !GetAtt WriteToCwlRole.Arn
+      Targets: 
+        - Id: SendToAccountsLogGroup
+          Arn: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${AccountsLogGroup}"
+
+  AccountKycIdCheckRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: acc_kyc_id_check_rule
+      Description: Rule to process KYC response.
+      EventBusName: !Ref LoanApplicationEventBus
+      EventPattern:
+        source:
+          - com.aws.kyc
+        detail-type:
+          - Identity check completed
+      State: ENABLED
+      RoleArn: !GetAtt WriteToCwlRole.Arn
+      Targets: 
+        - Id: SendToAccountsLogGroup
+          Arn: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${AccountsLogGroup}"
+  
+  
+  CustomerServiceKycApprovedRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: cs_kyc_approved_rule
+      Description: Rule to process KYC response.
+      EventBusName: !Ref LoanApplicationEventBus
+      EventPattern:
+        source:
+          - com.aws.kyc
+        detail-type:
+          - New account approved
+      State: ENABLED
+      RoleArn: !GetAtt WriteToCwlRole.Arn
+      Targets: 
+        - Id: SendToCustomerServiceLogGroup
+          Arn: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${CustomerServiceLogGroup}"
+  
+  WriteToCwlRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - events.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: WriteToAccountsLogGroup
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStreams'
+                  - 'logs:PutLogEvents'
+                Resource: 
+                  - !GetAtt AccountsLogGroup.Arn
+                  - !GetAtt CustomerServiceLogGroup.Arn
+
+
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
   # Find out more about other implicit resources you can reference within SAM
@@ -42,3 +244,4 @@ Outputs:
   LoanApplicationFunctionIamRole:
     Description: "Implicit IAM Role created for LoanApplication function"
     Value: !GetAtt LoanApplicationFunctionRole.Arn
+ 
