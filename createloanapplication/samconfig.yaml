@@ -1,12 +1,11 @@
 version = 0.1
-[dev]
-[dev.deploy]
-[dev.deploy.parameters]
-stack_name = "createloanapplication"
+[test]
+[test.deploy]
+[test.deploy.parameters]
+stack_name = "loan"
 s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-11okeji7zzwcw"
-s3_prefix = "createloanapplication"
+s3_prefix = "loan"
 region = "eu-west-2"
-confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
-disable_rollback = true
+parameter_overrides = "ParameterInstancePrefix=\"loan\""
 image_repositories = []

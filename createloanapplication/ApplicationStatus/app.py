@@ -1,27 +1,38 @@
-import json
-import requests
-import uuid
+ import json
 import boto3
 
 client = boto3.client('dynamodb')
 def lambda_handler(event, context): 
-    input = json.loads(event['body'])
+    print('event')
+    print(event['queryStringParameters'])
+    input = event['queryStringParameters']
+    print(input)
     response = client.get_item(
         TableName= 'applicationstatus',
         Key={
-            'ApplicationId': {'S': input['Id']}
+            'Id': {'S': input['id']}
         }
     )
-   
-    print(response['Item'])
-     
-    response = {
-        'statusCode': 200,
-        'body': json.dumps({'applicationstatus':response.Item.ApplicationStatus }}),
-        'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-        },
-    }
+    print('response')
+    print(response)
+    
+    if response == None:
+        response = {
+            'statusCode': 200,
+            'body': json.dumps({'applicationstatus':response['Item']['ApplicationStatus']['S'] }),
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+        }
+    else:
+        response = {
+            'statusCode': 200,
+            'body': json.dumps({'applicationstatus':'pending' }),
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+        }
 
     return response

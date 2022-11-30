@@ -143,9 +143,8 @@
       ],
       "Next": "Is Approved?",
       "ResultSelector": {
-        "TotalScore.$": "States.StringToJson($.Payload.body)"
-      },
-      "ResultPath": "$.CalculatedScore"
+        "CalculatedScore.$": "States.StringToJson($.Payload.body)"
+      }
     },
     "Is Approved?": {
       "Type": "Choice",
@@ -153,16 +152,12 @@
         {
           "And": [
             {
-              "And": [
-                {
-                  "Variable": "$.CalculatedScore.TotalScore.totalscore",
-                  "NumericGreaterThan": 1
-                },
-                {
-                  "Variable": "$.ApplicationDetail.Item.loanAmount",
-                  "NumericLessThan": 100
-                }
-              ]
+              "Variable": "$.CalculatedScore.loanAmount",
+              "NumericLessThan": 100
+            },
+            {
+              "Variable": "$.CalculatedScore.totalscore",
+              "NumericEquals": 2
             }
           ],
           "Next": "Save Approved status"
@@ -177,7 +172,7 @@
         "TableName": "applicationstatus",
         "Key": {
           "Id": {
-            "S.$": "$.Id"
+            "S.$": "$.CalculatedScore.id"
           }
         },
         "UpdateExpression": "SET ApplicationStatus = :status",
@@ -196,7 +191,7 @@
         "TableName": "applicationstatus",
         "Key": {
           "Id": {
-            "S.$": "$.Id"
+            "S.$": "$.CalculatedScore.id"
           }
         },
         "UpdateExpression": "SET ApplicationStatus = :status",
