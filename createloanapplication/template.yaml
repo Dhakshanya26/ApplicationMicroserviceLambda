@@ -22,13 +22,6 @@ Parameters:
     Description: "Prefix to be used in names of the things created by this stack."
    
 Resources: 
-  CodeBuildProject:
-    Type: AWS::CodeBuild::Project
-    Properties:
-      Environment:
-        ComputeType: BUILD_GENERAL1_SMALL
-        Image: sam/build-python3.6
-        Type: LINUX_CONTAINER 
 
   ApplicationTable:
     Type: AWS::DynamoDB::Table
