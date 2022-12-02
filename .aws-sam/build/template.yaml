@@ -1,0 +1,372 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'createloanapplication
+
+  Sample SAM Template for createloanapplication
+
+  '
+Globals:
+  Function:
+    Timeout: 3
+  Api:
+    Cors:
+      AllowMethods: '''GET,POST,OPTIONS'''
+      AllowHeaders: '''content-type'''
+      AllowOrigin: '''*'''
+Parameters:
+  ParameterInstancePrefix:
+    Type: String
+    Default: loan
+    Description: Prefix to be used in names of the things created by this stack.
+Resources:
+  ApplicationTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Applications
+      AttributeDefinitions:
+      - AttributeName: Id
+        AttributeType: S
+      KeySchema:
+      - AttributeName: Id
+        KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 10
+  ApplicationStatusTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ApplicationStatus
+      AttributeDefinitions:
+      - AttributeName: Id
+        AttributeType: S
+      KeySchema:
+      - AttributeName: Id
+        KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 10
+  GetCustomerCreditDataFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: GetCustomerCreditDataFunction
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Architectures:
+      - x86_64
+    Metadata:
+      SamResourceId: GetCustomerCreditDataFunction
+  GetCustomerFraudDataFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: GetCustomerFraudDataFunction
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Architectures:
+      - x86_64
+    Metadata:
+      SamResourceId: GetCustomerFraudDataFunction
+  CalculateTotalScoreFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: CalculateTotalScoreFunction
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Architectures:
+      - x86_64
+    Metadata:
+      SamResourceId: CalculateTotalScoreFunction
+  LoanApplicationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: LoanApplicationFunction
+      Handler: createloanapp.lambda_handler
+      Runtime: python3.9
+      Architectures:
+      - x86_64
+      Events:
+        LoanApplication:
+          Type: Api
+          Properties:
+            Path: /loanapplication
+            Method: post
+            Auth:
+              AddDefaultAuthorizerToCorsPreflight: false
+      Policies:
+      - AmazonDynamoDBFullAccess
+      - AWSStepFunctionsFullAccess
+      - AmazonEventBridgeFullAccess
+    Metadata:
+      SamResourceId: LoanApplicationFunction
+  GetAppStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: GetAppStatusFunction
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Architectures:
+      - x86_64
+      Events:
+        AppStatus:
+          Type: Api
+          Properties:
+            Path: /applicationstatus
+            Method: get
+            Auth:
+              AddDefaultAuthorizerToCorsPreflight: false
+      Policies:
+      - AmazonDynamoDBFullAccess
+      - AmazonEventBridgeFullAccess
+    Metadata:
+      SamResourceId: GetAppStatusFunction
+  LoanAppEventBus:
+    Type: AWS::Events::EventBus
+    Properties:
+      Name: LoanAppEventBus
+  AccountsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 3
+      LogGroupName:
+        Fn::Join:
+        - ''
+        - - /aws/events/
+          - Ref: ParameterInstancePrefix
+          - '-'
+          - accounts-logs
+  CustomerServiceLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 3
+      LogGroupName:
+        Fn::Join:
+        - ''
+        - - /aws/events/
+          - Ref: ParameterInstancePrefix
+          - '-'
+          - customer-service-logs
+  StateMachinesLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 3
+      LogGroupName:
+        Fn::Join:
+        - ''
+        - - /aws/states/
+          - Ref: ParameterInstancePrefix
+          - '-'
+          - statemachine-logs
+  AppStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: ../../statemachine/application.asl.json
+      DefinitionSubstitutions:
+        CentralEventBusName:
+          Ref: LoanAppEventBus
+        GetCustomerCreditDataFunction:
+          Fn::GetAtt:
+          - GetCustomerCreditDataFunction
+          - Arn
+        GetCustomerFraudDataFunction:
+          Fn::GetAtt:
+          - GetCustomerFraudDataFunction
+          - Arn
+        CalculateTotalScoreFunction:
+          Fn::GetAtt:
+          - CalculateTotalScoreFunction
+          - Arn
+      Policies:
+      - AWSXRayDaemonWriteAccess
+      - AWSLambda_FullAccess
+      - AmazonDynamoDBFullAccess
+      - CloudWatchFullAccess
+      - AmazonEventBridgeFullAccess
+      Logging:
+        Destinations:
+        - CloudWatchLogsLogGroup:
+            LogGroupArn:
+              Fn::GetAtt:
+              - StateMachinesLogGroup
+              - Arn
+        Level: ALL
+        IncludeExecutionData: true
+      Tracing:
+        Enabled: true
+      Events:
+        SubmittedRule:
+          Type: EventBridgeRule
+          Properties:
+            EventBusName:
+              Ref: LoanAppEventBus
+            InputPath: $.detail
+            Pattern:
+              source:
+              - com.aws.accounts
+              detail-type:
+              - Loan Application Submitted
+              account:
+              - Ref: AWS::AccountId
+  LoanAppSubmittedRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: LoanAppSubmittedRule
+      EventBusName:
+        Fn::GetAtt:
+        - LoanAppEventBus
+        - Arn
+      State: ENABLED
+      Targets:
+      - Arn:
+          Fn::GetAtt:
+          - AppStateMachine
+          - Arn
+        Id: AppStateMachine
+        RoleArn:
+          Fn::GetAtt:
+          - EventBridgeIAMrole
+          - Arn
+      EventPattern:
+        source:
+        - com.aws.submitloanapp
+  EventBridgeIAMrole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+              Fn::Sub: events.amazonaws.com
+          Action: sts:AssumeRole
+      Path: /
+      Policies:
+      - PolicyName: AccessStepFunction
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - cloudwatch:*
+            - logs:*
+            - lambda:InvokeFunction
+            - events:PutEvents
+            - events:*
+            - schemas:*
+            - scheduler:*
+            Resource:
+            - '*'
+  AccountKycResponseRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: acc_kyc_response_rule
+      Description: Rule to process results of KYC.
+      EventBusName:
+        Ref: LoanAppEventBus
+      EventPattern:
+        source:
+        - com.aws.kyc
+        detail-type:
+        - New account approved
+        - New account declined
+      State: ENABLED
+      RoleArn:
+        Fn::GetAtt:
+        - WriteToCwlRole
+        - Arn
+      Targets:
+      - Id: SendToAccountsLogGroup
+        Arn:
+          Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${AccountsLogGroup}
+  AccountKycIdCheckRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: acc_kyc_id_check_rule
+      Description: Rule to process KYC response.
+      EventBusName:
+        Ref: LoanAppEventBus
+      EventPattern:
+        source:
+        - com.aws.kyc
+        detail-type:
+        - Identity check completed
+      State: ENABLED
+      RoleArn:
+        Fn::GetAtt:
+        - WriteToCwlRole
+        - Arn
+      Targets:
+      - Id: SendToAccountsLogGroup
+        Arn:
+          Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${AccountsLogGroup}
+  CustomerServiceKycApprovedRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: cs_kyc_approved_rule
+      Description: Rule to process KYC response.
+      EventBusName:
+        Ref: LoanAppEventBus
+      EventPattern:
+        source:
+        - com.aws.kyc
+        detail-type:
+        - New account approved
+      State: ENABLED
+      RoleArn:
+        Fn::GetAtt:
+        - WriteToCwlRole
+        - Arn
+      Targets:
+      - Id: SendToCustomerServiceLogGroup
+        Arn:
+          Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${CustomerServiceLogGroup}
+  WriteToCwlRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - events.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: /
+      Policies:
+      - PolicyName: WriteToAccountsLogGroup
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStreams
+            - logs:PutLogEvents
+            Resource:
+            - Fn::GetAtt:
+              - AccountsLogGroup
+              - Arn
+            - Fn::GetAtt:
+              - CustomerServiceLogGroup
+              - Arn
+Outputs:
+  LoanApplicationApi:
+    Description: API Gateway endpoint URL for Prod stage for Hello World function
+    Value:
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/loanapplication/
+  AppStatusApi:
+    Description: API Gateway endpoint URL for Get stage for Application status
+    Value:
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/applicationstatus/
+  LoanApplicationFunction:
+    Description: LoanApplication Lambda Function ARN
+    Value:
+      Fn::GetAtt:
+      - LoanApplicationFunction
+      - Arn
+  LoanApplicationFunctionIamRole:
+    Description: Implicit IAM Role created for LoanApplication function
+    Value:
+      Fn::GetAtt:
+      - LoanApplicationFunctionRole
+      - Arn
