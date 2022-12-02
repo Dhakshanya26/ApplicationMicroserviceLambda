@@ -1,4 +1,4 @@
-# pipeline
+# loanapp
 
 **This is an example of how to create a minimal pipeline for SAM based Serverless Apps**
 
@@ -18,25 +18,25 @@ Replace the placeholders with values corresponding to your GitHub Repo and Token
 
 ```bash
 aws ssm put-parameter \
-    --name "/service/pipeline/github/repo" \
-    --description "Github Repository name for Cloudformation Stack pipeline-pipeline" \
+    --name "/service/loanapp/github/repo" \
+    --description "Github Repository name for Cloudformation Stack loanapp-pipeline" \
     --type "String" \
-    --value "GITHUB_REPO_NAME"
+    --value "ApplicationMicroserviceLambda"
 
 aws ssm put-parameter \
-    --name "/service/pipeline/github/token" \
-    --description "Github Token for Cloudformation Stack pipeline-pipeline" \
+    --name "/service/loanapp/github/token" \
+    --description "Github Token for Cloudformation Stack loanapp-pipeline" \
     --type "String" \
-    --value "TOKEN"
+    --value "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"
 
 aws ssm put-parameter \
-    --name "/service/pipeline/github/user" \
-    --description "Github Username for Cloudformation Stack pipeline-pipeline" \
+    --name "/service/loanapp/github/user" \
+    --description "Github Username for Cloudformation Stack loanapp-pipeline" \
     --type "String" \
     --value "GITHUB_USER"
 ```
 
-**NOTE:** Keep in mind that these Parameters will only be available within the same region you're deploying this Pipeline stack. Also, if these values ever change you will need to [update these parameters](https://docs.aws.amazon.com/cli/latest/reference/ssm/put-parameter.html) as well as update the "pipeline-pipeline" Cloudformation stack.
+**NOTE:** Keep in mind that these Parameters will only be available within the same region you're deploying this Pipeline stack. Also, if these values ever change you will need to [update these parameters](https://docs.aws.amazon.com/cli/latest/reference/ssm/put-parameter.html) as well as update the "loanapp-pipeline" Cloudformation stack.
 
 ## Pipeline creation
 
@@ -90,7 +90,7 @@ Run the following AWS CLI command to create your first pipeline for your SAM bas
 
 ```bash
 aws cloudformation create-stack \
-    --stack-name pipeline-pipeline \
+    --stack-name loanapp-pipeline \
     --template-body file://pipeline.yaml \
     --capabilities CAPABILITY_NAMED_IAM
 ```
@@ -99,7 +99,7 @@ This may take a couple of minutes to complete, therefore give it a minute or two
 
 ```bash
 aws cloudformation describe-stacks \
-    --stack-name pipeline-pipeline \
+    --stack-name loanapp-pipeline \
     --query 'Stacks[].Outputs'
 ```
 
