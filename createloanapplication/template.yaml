@@ -8,15 +8,65 @@ Description: >
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
   Function:
-    Timeout: 3
-
+    Timeout: 3 
+  Api: 
+    Cors:
+      AllowMethods: "'GET,POST,OPTIONS'"
+      AllowHeaders: "'content-type'"
+      AllowOrigin: "'*'"
+      # AllowCredentials: true
 Parameters:
   ParameterInstancePrefix:
     Type: String
     Default: "loan"
     Description: "Prefix to be used in names of the things created by this stack."
+   
+Resources: 
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: sam/build-python3.6
+        Type: LINUX_CONTAINER 
 
-Resources:
+  ApplicationTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Applications
+      AttributeDefinitions:
+      - AttributeName:
+          'Id'
+        AttributeType:
+          'S'
+      KeySchema:
+      - AttributeName:
+          'Id'
+        KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits:
+          5
+        WriteCapacityUnits:
+          10
+  ApplicationStatusTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ApplicationStatus
+      AttributeDefinitions:
+      - AttributeName:
+          'Id'
+        AttributeType:
+          'S'
+      KeySchema:
+      - AttributeName:
+          'Id'
+        KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits:
+          5
+        WriteCapacityUnits:
+          10  
+ 
   GetCustomerCreditDataFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
@@ -57,6 +107,8 @@ Resources:
           Properties:
             Path: /loanapplication
             Method: post
+            Auth:
+              AddDefaultAuthorizerToCorsPreflight: false
       Policies:
       # Give the Lambda service access to poll your DynamoDB Stream
         - AmazonDynamoDBFullAccess
@@ -77,6 +129,8 @@ Resources:
           Properties:
             Path: /applicationstatus
             Method: get
+            Auth:
+              AddDefaultAuthorizerToCorsPreflight: false
       Policies:
       # Give the Lambda service access to poll your DynamoDB Stream
         - AmazonDynamoDBFullAccess

@@ -8,7 +8,7 @@ def lambda_handler(event, context):
     input = json.loads(event['body'])
     applicationId = str(uuid.uuid1())
     data = client.put_item(
-        TableName = 'applications',
+        TableName = 'Applications',
         Item = {
             'Id': {
                 'S':  applicationId

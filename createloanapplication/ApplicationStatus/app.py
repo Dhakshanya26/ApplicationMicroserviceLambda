@@ -1,4 +1,4 @@
- import json
+import json
 import boto3
 
 client = boto3.client('dynamodb')
@@ -8,7 +8,7 @@ def lambda_handler(event, context):
     input = event['queryStringParameters']
     print(input)
     response = client.get_item(
-        TableName= 'applicationstatus',
+        TableName= 'ApplicationStatus',
         Key={
             'Id': {'S': input['id']}
         }
@@ -19,7 +19,7 @@ def lambda_handler(event, context):
     if response == None:
         response = {
             'statusCode': 200,
-            'body': json.dumps({'applicationstatus':response['Item']['ApplicationStatus']['S'] }),
+            'body': json.dumps({'applicationstatus':'pending'),
             'headers': {
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*'
@@ -28,7 +28,7 @@ def lambda_handler(event, context):
     else:
         response = {
             'statusCode': 200,
-            'body': json.dumps({'applicationstatus':'pending' }),
+            'body': json.dumps({'applicationstatus':response['Item']['ApplicationStatus']['S'] }),
             'headers': {
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*'
