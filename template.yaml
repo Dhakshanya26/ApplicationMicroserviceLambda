@@ -267,8 +267,26 @@ Resources:
     Properties:
       Name: LoanAppApiUrl
       Type: String
-      Value: !Sub "${https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/}"
+      Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
       Description: SSM Parameter for running date command.
+      
+      Tags:
+        Environment: DEV
+  BackEndId:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: LoanAppApiUrlId
+      Type: String
+      Value: !Sub "${ServerlessRestApi}"
+      Description: SSM Parameter for running date command.
+  
+  BackEndRegion:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: LoanAppApiRegion
+      Type: String
+      Value: !Sub "${AWS::Region}"
+      Description: SSM Parameter for running date command.    
       
       Tags:
         Environment: DEV
