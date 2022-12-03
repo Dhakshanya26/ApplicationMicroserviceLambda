@@ -255,70 +255,6 @@ Resources:
             - scheduler:*
             Resource:
             - '*'
-  AccountKycResponseRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Name: acc_kyc_response_rule
-      Description: Rule to process results of KYC.
-      EventBusName:
-        Ref: LoanAppEventBus
-      EventPattern:
-        source:
-        - com.aws.kyc
-        detail-type:
-        - New account approved
-        - New account declined
-      State: ENABLED
-      RoleArn:
-        Fn::GetAtt:
-        - WriteToCwlRole
-        - Arn
-      Targets:
-      - Id: SendToAccountsLogGroup
-        Arn:
-          Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${AccountsLogGroup}
-  AccountKycIdCheckRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Name: acc_kyc_id_check_rule
-      Description: Rule to process KYC response.
-      EventBusName:
-        Ref: LoanAppEventBus
-      EventPattern:
-        source:
-        - com.aws.kyc
-        detail-type:
-        - Identity check completed
-      State: ENABLED
-      RoleArn:
-        Fn::GetAtt:
-        - WriteToCwlRole
-        - Arn
-      Targets:
-      - Id: SendToAccountsLogGroup
-        Arn:
-          Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${AccountsLogGroup}
-  CustomerServiceKycApprovedRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Name: cs_kyc_approved_rule
-      Description: Rule to process KYC response.
-      EventBusName:
-        Ref: LoanAppEventBus
-      EventPattern:
-        source:
-        - com.aws.kyc
-        detail-type:
-        - New account approved
-      State: ENABLED
-      RoleArn:
-        Fn::GetAtt:
-        - WriteToCwlRole
-        - Arn
-      Targets:
-      - Id: SendToCustomerServiceLogGroup
-        Arn:
-          Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${CustomerServiceLogGroup}
   WriteToCwlRole:
     Type: AWS::IAM::Role
     Properties:
@@ -349,6 +285,16 @@ Resources:
             - Fn::GetAtt:
               - CustomerServiceLogGroup
               - Arn
+  BackEndUrl:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: LoanAppApiUrl
+      Type: String
+      Value:
+        Fn::Sub: ${https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/}
+      Description: SSM Parameter for running date command.
+      Tags:
+        Environment: DEV
 Outputs:
   LoanApplicationApi:
     Description: API Gateway endpoint URL for Prod stage for Hello World function

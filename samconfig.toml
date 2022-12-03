@@ -11,3 +11,14 @@ disable_rollback = true
 parameter_overrides = "ParameterInstancePrefix=\"aws\""
 image_repositories = []
 confirm_changeset = true
+
+[test]
+[test.deploy]
+[test.deploy.parameters]
+stack_name = "aws"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-1baaafd36h2fw"
+s3_prefix = "aws"
+region = "us-east-2"
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "ParameterInstancePrefix=\"aws\""
+image_repositories = []
