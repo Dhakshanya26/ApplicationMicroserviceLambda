@@ -3,9 +3,9 @@ version = 0.1
 [y.deploy]
 [y.deploy.parameters]
 stack_name = "sam-app"
-s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-8864rfdzfnoa"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-1baaafd36h2fw"
 s3_prefix = "sam-app"
-region = "us-west-2"
+region = "us-east-2"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 disable_rollback = true

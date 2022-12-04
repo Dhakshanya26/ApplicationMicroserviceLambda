@@ -10,16 +10,16 @@ def lambda_handler(event, context):
     response = client.get_item(
         TableName= 'ApplicationStatus',
         Key={
-            'Id': {'S': input['id']}
+            'Id': {'S': input['Id']}
         }
-    )
+    ) 
+    
     print('response')
     print(response)
-    
-    if response == None:
+    if response['ResponseMetadata']:
         response = {
             'statusCode': 200,
-            'body': json.dumps({'applicationstatus':'pending'),
+            'body': json.dumps({'applicationstatus':'pending'}),
             'headers': {
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*'
