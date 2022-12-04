@@ -13,11 +13,28 @@ def lambda_handler(event, context):
             'Id': {'S': input['Id']}
         }
     ) 
-    
-    print('response')
-    print(response)
-    if response['ResponseMetadata']:
-        response = {
+    try: 
+        if response['Item'] is None:
+            output = {
+                'statusCode': 200,
+                'body': json.dumps({'applicationstatus':'pending'}),
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+            }
+        else:
+            output = {
+                'statusCode': 200,
+                'body': json.dumps({'applicationstatus':response['Item']['ApplicationStatus']['S'] }),
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+            }
+        
+    except:
+        output = {
             'statusCode': 200,
             'body': json.dumps({'applicationstatus':'pending'}),
             'headers': {
@@ -25,14 +42,4 @@ def lambda_handler(event, context):
                 'Access-Control-Allow-Origin': '*'
             },
         }
-    else:
-        response = {
-            'statusCode': 200,
-            'body': json.dumps({'applicationstatus':response['Item']['ApplicationStatus']['S'] }),
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-        }
-
-    return response
+    return output

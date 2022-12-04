@@ -4,8 +4,7 @@
   "States": {
     "Pass input": {
       "Type": "Pass",
-      "Next": "Parallel",
-      "OutputPath": "$.detail"
+      "Next": "Parallel"
     },
     "Parallel": {
       "Type": "Parallel",
@@ -84,7 +83,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::dynamodb:getItem",
       "Parameters": {
-        "TableName": "applications",
+        "TableName": "Applications",
         "Key": {
           "Id": {
             "S.$": "$.Id"
@@ -98,7 +97,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::dynamodb:putItem",
       "Parameters": {
-        "TableName": "applicationstatus",
+        "TableName": "ApplicationStatus",
         "Item": {
           "Id": {
             "S.$": "$.Id"
@@ -169,7 +168,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::dynamodb:updateItem",
       "Parameters": {
-        "TableName": "applicationstatus",
+        "TableName": "ApplicationStatus",
         "Key": {
           "Id": {
             "S.$": "$.CalculatedScore.id"
@@ -188,7 +187,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::dynamodb:updateItem",
       "Parameters": {
-        "TableName": "applicationstatus",
+        "TableName": "ApplicationStatus",
         "Key": {
           "Id": {
             "S.$": "$.CalculatedScore.id"

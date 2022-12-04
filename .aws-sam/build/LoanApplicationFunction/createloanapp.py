@@ -5,7 +5,8 @@ import boto3
 from boto3.dynamodb.conditions import Key, Attr
 client = boto3.client('dynamodb')
 def lambda_handler(event, context): 
-    input = json.loads(event['body'])
+    body = json.loads(event['body'])
+    input = body['body']
     applicationId = str(uuid.uuid1())
     data = client.put_item(
         TableName = 'Applications',
@@ -34,7 +35,7 @@ def lambda_handler(event, context):
         Entries=[
             {
                 'Source':'com.aws.submitloanapp',
-                'DetailType':'Order Notification',
+                'DetailType':'Loan Application Submitted',
                 'Detail':json.dumps(detailJsonString),
                 'EventBusName':'LoanAppEventBus' 
             }

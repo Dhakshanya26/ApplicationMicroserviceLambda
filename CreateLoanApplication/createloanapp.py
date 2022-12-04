@@ -35,7 +35,7 @@ def lambda_handler(event, context):
         Entries=[
             {
                 'Source':'com.aws.submitloanapp',
-                'DetailType':'Order Notification',
+                'DetailType':'Loan Application Submitted',
                 'Detail':json.dumps(detailJsonString),
                 'EventBusName':'LoanAppEventBus' 
             }

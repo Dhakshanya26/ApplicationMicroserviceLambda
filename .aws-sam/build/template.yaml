@@ -200,7 +200,7 @@ Resources:
             InputPath: $.detail
             Pattern:
               source:
-              - com.aws.accounts
+              - com.aws.submitloanapp
               detail-type:
               - Loan Application Submitted
               account:
